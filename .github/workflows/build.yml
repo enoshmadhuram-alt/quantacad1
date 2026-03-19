@@ -1,26 +1,64 @@
 name: Build Windows EXE
- 
+
 on: push
- 
+
 jobs:
   build:
     runs-on: windows-latest
- 
+
     steps:
       - uses: actions/checkout@v4
- 
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
- 
+
+      - name: Create build folder and generate icon
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path quantacad-app\build
+          Add-Type -AssemblyName System.Drawing
+          $bmp = New-Object System.Drawing.Bitmap(256, 256)
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.Clear([System.Drawing.Color]::FromArgb(13, 15, 20))
+          $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(79, 124, 255))
+          $g.FillEllipse($brush, 28, 28, 200, 200)
+          $font = New-Object System.Drawing.Font("Arial", 80, [System.Drawing.FontStyle]::Bold)
+          $textBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+          $sf = New-Object System.Drawing.StringFormat
+          $sf.Alignment = [System.Drawing.StringAlignment]::Center
+          $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
+          $g.DrawString("Q", $font, $textBrush, [System.Drawing.RectangleF]::FromLTRB(0,0,256,256), $sf)
+          $g.Dispose()
+          $bmp.Save("quantacad-app\build\icon.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $pngBytes = [System.IO.File]::ReadAllBytes("quantacad-app\build\icon.png")
+          $ms = New-Object System.IO.MemoryStream
+          $bw = New-Object System.IO.BinaryWriter($ms)
+          $bw.Write([uint16]0)
+          $bw.Write([uint16]1)
+          $bw.Write([uint16]1)
+          $bw.Write([byte]0)
+          $bw.Write([byte]0)
+          $bw.Write([byte]0)
+          $bw.Write([byte]0)
+          $bw.Write([uint16]1)
+          $bw.Write([uint16]32)
+          $bw.Write([uint32]$pngBytes.Length)
+          $bw.Write([uint32]22)
+          $bw.Write($pngBytes)
+          $bw.Flush()
+          [System.IO.File]::WriteAllBytes("quantacad-app\build\icon.ico", $ms.ToArray())
+          $bw.Dispose()
+          Write-Host "Icon generated OK"
+
       - name: Run npm install
         run: npm install
         working-directory: quantacad-app
- 
+
       - name: Build Windows EXE
         run: npm run build:win
         working-directory: quantacad-app
- 
+
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
