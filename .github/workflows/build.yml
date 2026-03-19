@@ -1,17 +1,28 @@
 name: Build Windows EXE
+ 
 on: push
+ 
 jobs:
   build:
     runs-on: windows-latest
+ 
     steps:
       - uses: actions/checkout@v4
+ 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
-      - run: npm run build:win
-      - uses: actions/upload-artifact@v4
+ 
+      - name: Run npm install
+        run: npm install
+        working-directory: quantacad-app
+ 
+      - name: Build Windows EXE
+        run: npm run build:win
+        working-directory: quantacad-app
+ 
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
         with:
           name: QuantaCAD-Windows
-          path: dist/*.exe
-          
+          path: quantacad-app/dist/*.exe
