@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuantaCAD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- CUSTOM TITLE BAR -->
+<div class="titlebar" id="titlebar">
+  <div class="titlebar-drag">
+    <div class="app-logo"><span class="logo-icon">⬡</span> QuantaCAD</div>
+    <div class="project-info" id="titleProject">INFRA-2024-07 — Ground Floor</div>
+  </div>
+  <div class="titlebar-controls" id="windowControls">
+    <button class="wc-btn" id="btnMin" title="Minimize">—</button>
+    <button class="wc-btn" id="btnMax" title="Maximize">⬜</button>
+    <button class="wc-btn danger" id="btnClose" title="Close">✕</button>
+  </div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="toolbar-group">
+    <span class="tg-label">FILE</span>
+    <button class="tool-btn" title="New Project (Ctrl+N)" onclick="newProject()">📄</button>
+    <button class="tool-btn" title="Open Project (Ctrl+O)" onclick="openProjectDialog()">📂</button>
+    <button class="tool-btn" title="Save (Ctrl+S)" onclick="saveProject()">💾</button>
+    <button class="tool-btn accent" title="Import Drawing" onclick="importDrawingDialog()">⬆ Import</button>
+  </div>
+  <div class="tool-sep"></div>
+  <div class="toolbar-group">
+    <span class="tg-label">TOOL</span>
+    <button class="tool-btn active" id="toolSelect" title="Select (Esc)" onclick="setTool('select')">↖</button>
+    <button class="tool-btn" id="toolPan" title="Pan (Space)" onclick="setTool('pan')">✥</button>
+  </div>
+  <div class="tool-sep"></div>
+  <div class="toolbar-group">
+    <span class="tg-label">MEASURE</span>
+    <button class="tool-btn" id="toolLength" title="Length (L)" onclick="setTool('length')">⟵⟶</button>
+    <button class="tool-btn" id="toolArea" title="Area (R)" onclick="setTool('area')">⬛</button>
+    <button class="tool-btn" id="toolCount" title="Count (C)" onclick="setTool('count')">⦿</button>
+    <button class="tool-btn" id="toolVolume" title="Volume (V)" onclick="setTool('volume')">◧</button>
+  </div>
+  <div class="tool-sep"></div>
+  <div class="toolbar-group">
+    <span class="tg-label">SNAP</span>
+    <button class="tool-btn active" id="snapGrid" title="Grid Snap (G)" onclick="toggleSnap('grid')">⊞</button>
+    <button class="tool-btn" id="snapAngle" title="Ortho Snap (O)" onclick="toggleSnap('angle')">∠</button>
+  </div>
+  <div class="tool-sep"></div>
+  <div class="toolbar-group">
+    <span class="tg-label">SCALE</span>
+    <input class="tb-input mono" value="1:100" id="scaleInput" title="Drawing Scale" style="width:80px" onchange="updateScale()"/>
+    <button class="tool-btn" title="Calibrate Scale (K)" onclick="startCalibrate()">📐</button>
+  </div>
+  <div class="tool-sep"></div>
+  <div class="toolbar-group">
+    <span class="tg-label">UNIT</span>
+    <select class="tb-select" id="unitSelect" onchange="changeUnit()">
+      <option>mm</option><option selected>m</option><option>ft</option><option>inch</option>
+    </select>
+  </div>
+  <div class="tool-sep"></div>
+  <div class="toolbar-group">
+    <button class="tool-btn" title="Undo (Ctrl+Z)" onclick="undo()">↩</button>
+    <button class="tool-btn" title="Redo (Ctrl+Y)" onclick="redo()">↪</button>
+    <button class="tool-btn" title="Delete" onclick="deleteSelected()" style="color:var(--danger)">⌫</button>
+  </div>
+  <div class="tool-sep"></div>
+  <div class="toolbar-group" style="margin-left:auto">
+    <button class="tool-btn accent-green" onclick="showCostSummary()">₹ Cost Summary</button>
+    <button class="tool-btn accent" onclick="exportReport()">⬇ Export</button>
+  </div>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel" id="leftPanel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" id="ltab1" onclick="switchLeftTab('drawings')">Drawings</div>
+      <div class="panel-tab" id="ltab2" onclick="switchLeftTab('layers')">Layers</div>
+    </div>
+    <div class="panel-body" id="leftBody">
+
+      <!-- Drawings -->
+      <div id="paneDrawings">
+        <div id="drawingTree"></div>
+        <div style="padding:8px 4px">
+          <button class="add-btn" onclick="importDrawingDialog()">+ Import Drawing</button>
+        </div>
+      </div>
+
+      <!-- Layers -->
+      <div id="paneLayers" style="display:none">
+        <div id="layerList"></div>
+        <div style="padding:8px 4px">
+          <button class="add-btn" onclick="addLayer()">+ New Layer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap">
+    <div class="canvas-tabs" id="canvasTabs"></div>
+
+    <div class="canvas-area" id="canvasArea">
+      <div class="ruler-corner"></div>
+      <canvas id="rulerH" class="ruler-h"></canvas>
+      <canvas id="rulerV" class="ruler-v"></canvas>
+      <canvas id="mainCanvas"></canvas>
+
+      <!-- Tooltip -->
+      <div class="measure-tip" id="measureTip" style="display:none">0.00 m</div>
+
+      <!-- Calibration overlay -->
+      <div class="calibrate-overlay" id="calibrateOverlay" style="display:none">
+        <div class="calibrate-box">
+          <div class="cal-title">📐 Calibrate Scale</div>
+          <div class="cal-desc">Click two known points on the drawing, then enter the real distance.</div>
+          <div class="cal-step" id="calStep">Step 1: Click the first point</div>
+          <div id="calInputRow" style="display:none">
+            <input class="tb-input" id="calDist" placeholder="Real distance (e.g. 5.0)" style="width:140px"/>
+            <select class="tb-select" id="calUnit"><option>m</option><option>mm</option><option>ft</option></select>
+            <button class="tool-btn accent" onclick="applyCalibration()">Apply</button>
+          </div>
+          <button class="cancel-btn" onclick="cancelCalibrate()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="canvas-legend" id="canvasLegend">
+        <div class="leg-title">LEGEND</div>
+        <div class="leg-item"><div class="leg-line blue"></div>Length</div>
+        <div class="leg-item"><div class="leg-fill green"></div>Area</div>
+        <div class="leg-item"><div class="leg-fill orange"></div>Volume</div>
+        <div class="leg-item"><div class="leg-dot yellow"></div>Count</div>
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState">
+        <div class="es-icon">📐</div>
+        <div class="es-title">No Drawing Loaded</div>
+        <div class="es-sub">Import a DWG, DXF, or PDF to start your takeoff</div>
+        <button class="tool-btn accent" style="padding:8px 24px;font-size:13px" onclick="importDrawingDialog()">Import Drawing</button>
+      </div>
+
+      <!-- Zoom controls -->
+      <div class="zoom-panel">
+        <button class="zoom-btn" onclick="zoomBy(1.2)">+</button>
+        <div class="zoom-val" id="zoomVal">100%</div>
+        <button class="zoom-btn" onclick="zoomBy(0.83)">−</button>
+        <button class="zoom-btn" onclick="fitView()" title="Fit">⊡</button>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="statusbar">
+      <span class="sb-item"><div class="sb-dot green"></div><span id="sbStatus">Ready</span></span>
+      <span class="sb-sep"></span>
+      <span class="sb-item">X: <span class="sb-val coord" id="sbX">0.000</span></span>
+      <span class="sb-item">Y: <span class="sb-val coord" id="sbY">0.000</span></span>
+      <span class="sb-sep"></span>
+      <span class="sb-item">Scale: <span class="sb-val blue" id="sbScale">1:100</span></span>
+      <span class="sb-item">Live: <span class="sb-val orange" id="sbLive">—</span></span>
+      <span class="sb-sep"></span>
+      <span class="sb-item" style="margin-left:auto">Drawing: <span class="sb-val" id="sbDrawing">—</span></span>
+      <span class="sb-item">Items: <span class="sb-val blue" id="sbItems">0</span></span>
+      <span class="sb-item">Zoom: <span class="sb-val" id="sbZoom">100%</span></span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" id="rtab1" onclick="switchRightTab('takeoff')">Takeoff</div>
+      <div class="panel-tab" id="rtab2" onclick="switchRightTab('props')">Properties</div>
+      <div class="panel-tab" id="rtab3" onclick="switchRightTab('cost')">Cost</div>
+    </div>
+    <div class="panel-body" id="rightBody">
+
+      <!-- Takeoff -->
+      <div id="rpTakeoff">
+        <div id="takeoffGroups"></div>
+        <button class="add-btn" onclick="openAddItemModal()">+ Add Measurement Item</button>
+      </div>
+
+      <!-- Properties -->
+      <div id="rpProps" style="display:none">
+        <div id="propsContent">
+          <div class="no-sel">No item selected.<br>Click a measurement on the canvas or takeoff list.</div>
+        </div>
+      </div>
+
+      <!-- Cost -->
+      <div id="rpCost" style="display:none">
+        <div id="costContent"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM PANEL SPLITTER -->
+<div class="splitter-h" id="splitterH"></div>
+
+<!-- BOTTOM PANEL -->
+<div class="bottom-panel" id="bottomPanel">
+  <div class="panel-tabs" style="background:var(--surface2)">
+    <div class="panel-tab active" id="bptab1" onclick="switchBpTab('register')">Measurement Register</div>
+    <div class="panel-tab" id="bptab2" onclick="switchBpTab('log')">Activity Log</div>
+    <div class="panel-tab" id="bptab3" onclick="switchBpTab('dims')">Dimensions</div>
+    <div style="margin-left:auto;padding:4px 8px;display:flex;gap:6px">
+      <button class="tool-btn" style="font-size:11px;padding:3px 10px" onclick="exportCSV()">↓ CSV</button>
+    </div>
+  </div>
+  <div class="bp-body" id="bpBody">
+    <div id="bpRegister"><table id="registerTable"><thead><tr>
+      <th>#</th><th>Description</th><th>Type</th><th>Layer</th><th>Drawing</th>
+      <th style="text-align:right">Qty</th><th>Unit</th><th style="text-align:right">Rate (₹)</th>
+      <th style="text-align:right">Total (₹)</th><th>Notes</th><th></th>
+    </tr></thead><tbody id="registerBody"></tbody></table></div>
+    <div id="bpLog" style="display:none"><table><thead><tr><th>Time</th><th>Action</th><th>Details</th></tr></thead><tbody id="logBody"></tbody></table></div>
+    <div id="bpDims" style="display:none"><table><thead><tr><th>ID</th><th>Start X</th><th>Start Y</th><th>End X</th><th>End Y</th><th style="text-align:right">Px Length</th><th style="text-align:right">Real</th><th>Unit</th></tr></thead><tbody id="dimsBody"></tbody></table></div>
+  </div>
+</div>
+
+<!-- MODAL: Add Item -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Add Measurement Item</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row"><div class="form-label">Description</div><input class="form-input" id="fDesc" placeholder="e.g. Slab — Ground Floor"/></div>
+      <div class="form-grid2">
+        <div><div class="form-label">Type</div><select class="form-input" id="fType"><option>Area</option><option>Length</option><option>Count</option><option>Volume</option></select></div>
+        <div><div class="form-label">Unit</div><select class="form-input" id="fUnit"><option>m²</option><option>m</option><option>Nr</option><option>m³</option><option>kg</option><option>LS</option></select></div>
+      </div>
+      <div class="form-grid2">
+        <div><div class="form-label">Quantity</div><input class="form-input" id="fQty" type="number" step="0.01" placeholder="0.00"/></div>
+        <div><div class="form-label">Unit Rate (₹)</div><input class="form-input" id="fRate" type="number" step="1" placeholder="0.00"/></div>
+      </div>
+      <div class="form-row"><div class="form-label">Trade Group</div>
+        <select class="form-input" id="fGroup">
+          <option>Concrete Works</option><option>Masonry & Walls</option><option>Openings</option><option>Finishes</option><option>MEP</option><option>Civil Works</option><option>New Group…</option>
+        </select>
+      </div>
+      <div class="form-row"><div class="form-label">Notes / Specification</div><input class="form-input" id="fNotes" placeholder="Grade, thickness, spec…"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitItem()">Add to Register</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Shortcuts -->
+<div class="modal-overlay" id="shortcutsOverlay">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header"><span class="modal-title">⌨ Keyboard Shortcuts</span><button class="modal-close" onclick="document.getElementById('shortcutsOverlay').classList.remove('show')">✕</button></div>
+    <div class="modal-body" style="columns:2;gap:20px">
+      <div class="shortcut-group"><div class="sc-title">Tools</div>
+        <div class="sc-row"><kbd>Esc</kbd><span>Select tool</span></div>
+        <div class="sc-row"><kbd>L</kbd><span>Length</span></div>
+        <div class="sc-row"><kbd>R</kbd><span>Area</span></div>
+        <div class="sc-row"><kbd>C</kbd><span>Count</span></div>
+        <div class="sc-row"><kbd>V</kbd><span>Volume</span></div>
+        <div class="sc-row"><kbd>Space</kbd><span>Pan tool</span></div>
+      </div>
+      <div class="shortcut-group"><div class="sc-title">Canvas</div>
+        <div class="sc-row"><kbd>Scroll</kbd><span>Zoom</span></div>
+        <div class="sc-row"><kbd>Ctrl+0</kbd><span>Fit view</span></div>
+        <div class="sc-row"><kbd>G</kbd><span>Toggle grid snap</span></div>
+        <div class="sc-row"><kbd>K</kbd><span>Calibrate scale</span></div>
+        <div class="sc-row"><kbd>Del</kbd><span>Delete selected</span></div>
+        <div class="sc-row"><kbd>Ctrl+Z</kbd><span>Undo</span></div>
+      </div>
+      <div class="shortcut-group"><div class="sc-title">File</div>
+        <div class="sc-row"><kbd>Ctrl+N</kbd><span>New project</span></div>
+        <div class="sc-row"><kbd>Ctrl+O</kbd><span>Open project</span></div>
+        <div class="sc-row"><kbd>Ctrl+S</kbd><span>Save</span></div>
+        <div class="sc-row"><kbd>Ctrl+I</kbd><span>Import drawing</span></div>
+        <div class="sc-row"><kbd>Ctrl+E</kbd><span>Export report</span></div>
+      </div>
+      <div class="shortcut-group"><div class="sc-title">Measure</div>
+        <div class="sc-row"><kbd>DblClick</kbd><span>Finish polyline</span></div>
+        <div class="sc-row"><kbd>RightClick</kbd><span>Finish / cancel</span></div>
+        <div class="sc-row"><kbd>Enter</kbd><span>Finish measure</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
